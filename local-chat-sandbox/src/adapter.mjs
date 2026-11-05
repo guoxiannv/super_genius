@@ -20,12 +20,13 @@ export class Bridge{
    const event=events.find(e=>e.event_id===m.event_id&&e.project_id==='local-chat-sandbox'&&e.thread_id===m.room_id);
    if(!event){if(Date.now()-Date.parse(m.submitted_at)>60000)await this.store.write(data=>{const current=data.messages.find(x=>x.id===m.id);current.delivery='missing_result';current.error='Harness 未找到此事件；请核对持久会话，勿直接重复执行';});continue;}
    if(event.preview&&JSON.stringify(d.messages.find(x=>x.id==='preview-'+m.id)?.preview)!==JSON.stringify(event.preview))await this.store.write(data=>{const id='preview-'+m.id;const previous=data.messages.find(x=>x.id===id);const card={id,room_id:m.room_id,type:'bot',author:{name:'app-factory',role:'版本预览',color:'#267265'},text:event.preview.summary,preview:event.preview,reply_to:m.id,task_id:event.outcome?.task_id,event_id:m.event_id,created_at:previous?.created_at||new Date().toISOString(),delivery:'done'};if(previous)Object.assign(previous,card);else data.messages.push(card);});
-   if(m.delivery!=='submitted')continue;
+   if(m.delivery!=='submitted'&&!(event.replies||[]).some(reply=>!d.messages.some(x=>x.id==='harness-'+reply.id)))continue;
    await this.store.write(data=>{
-    const current=data.messages.find(x=>x.id===m.id);current.stage=event.stage||'Harness 正在处理';current.task_id=event.outcome?.task_id??current.task_id;
+    const current=data.messages.find(x=>x.id===m.id);current.stage=event.stage||'Harness 正在处理';current.disposition=event.disposition;current.task_id=event.outcome?.task_id??current.task_id;
     const dirs=events.filter(e=>e.thread_id===m.room_id).map(e=>e.artifactDir).filter(Boolean);
     for(const reply of event.replies||[]){const id='harness-'+reply.id;if(!data.messages.some(x=>x.id===id))data.messages.push({id,room_id:m.room_id,type:'bot',author:{name:'app-factory',role:'DeepSeek Harness',color:'#267265'},text:reply.text,artifactDirs:dirs,reply_to:m.id,task_id:current.task_id,event_id:m.event_id,created_at:new Date(reply.time||Date.now()).toISOString(),delivery:'done'});}
    });
+   if(m.delivery!=='submitted')continue;
    if(event.status==='failed'){await this.store.write(data=>{const current=data.messages.find(x=>x.id===m.id);current.delivery='failed';current.error=event.error||'Harness 执行失败；请查看过程';});continue;}
    if(event.status!=='done'){if(event.progress?.length)await this.store.write(data=>{const current=data.messages.find(x=>x.id===m.id);current.progress=event.progress;});continue;}
    await this.store.write(data=>{

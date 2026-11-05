@@ -6,6 +6,7 @@ import {homedir} from 'node:os';
 import {readPreview,productContext} from '../../app-factory-harness/product-state.mjs';
 import {registeredApps} from '../../app-factory-harness/config.mjs';
 import {composition} from '../../app-factory-harness/composition.mjs';
+import {consumeGroupEvent} from './group-events.mjs';
 const localRoot=fileURLToPath(new URL('../',import.meta.url));
 export class HarnessAdapter{
  constructor({root=process.env.DSH_ROOT||'/Users/hw/Desktop/deepseek-harness',dataDir=resolve(localRoot,'data/sdk'),factory,env}={}){this.root=root;this.dataDir=dataDir;this.factory=factory;this.env=env;this.url='DeepSeek Harness · sdk';this.sessions=new Map();this.operations=new Set();this.tail=Promise.resolve();this.roomQueues=new Map();this.monitors=new Map();this.closing=false;}
@@ -64,7 +65,7 @@ export class HarnessAdapter{
   roomState.revision=(roomState.revision||0)+1;job.revision=`r${roomState.revision}`;job.profiles=goals.profiles;
   const product=productContext(goals,room,this.state.jobs);
   const instructions=resolve(localRoot,'harness/HARMONY.md');
-  const blocks=[{type:'text',text:JSON.stringify({kind:'group_message',product,revision:job.revision,preview_contract:{path:resolve(artifactDir,'preview.json'),schema:{revision:job.revision,status:'preview | verified | blocked',summary:'一句面向用户的变化说明',images:[{profile:'phone | unfolded | tablet',path:'截图相对路径'}],checks:[{profile:'phone | unfolded | tablet',status:'pending | passed | failed | unavailable',evidence:'实际验证说明'}]},rule:'交给 Worker：第一张可看的真实截图完成后就用原生 write 工具发布 preview.json；后续更新同文件。不要等全部回归完成。passed 需要同版本截图与证据。'},room:{id:room.id,name:room.name},app,actor:message.author,addressed:message.addressed,text:message.text,quote:quoted?{text:quoted.text,task:quoted.task_id,revision:quoted.preview?.revision,images:quoted.preview?.images}:null,unseen_history:fresh.map(m=>({id:m.id,actor:m.author,text:m.text,images:m.attachments?.map(a=>a.path)})),images:message.attachments?.map(a=>a.path),worker_harmony_instructions:instructions,artifact_directory:artifactDir,instructions:'将鸿蒙操作说明路径与参考图路径交给 Worker 自行读取。所有执行任务通过原生 subagent，继续同一任务通过 send_message。普通消息判断是否静默；无须群回复时输出 [[SILENT]]。'},null,2)}];
+  const blocks=[{type:'text',text:JSON.stringify({kind:'group_message',event_id:message.event_id,product,revision:job.revision,preview_contract:{path:resolve(artifactDir,'preview.json'),schema:{revision:job.revision,status:'preview | verified | blocked',summary:'一句面向用户的变化说明',images:[{profile:'phone | unfolded | tablet',path:'截图相对路径'}],checks:[{profile:'phone | unfolded | tablet',status:'pending | passed | failed | unavailable',evidence:'实际验证说明'}]},rule:'交给 Worker：第一张可看的真实截图完成后就用原生 write 工具发布 preview.json；后续更新同文件。不要等全部回归完成。passed 需要同版本截图与证据。'},room:{id:room.id,name:room.name},app,actor:message.author,addressed:message.addressed,text:message.text,quote:quoted?{text:quoted.text,task:quoted.task_id,revision:quoted.preview?.revision,images:quoted.preview?.images}:null,unseen_history:fresh.map(m=>({id:m.id,actor:m.author,text:m.text,images:m.attachments?.map(a=>a.path)})),images:message.attachments?.map(a=>a.path),worker_harmony_instructions:instructions,artifact_directory:artifactDir,instructions:'将鸿蒙操作说明路径与参考图路径交给 Worker 自行读取。所有执行任务通过原生 subagent，继续同一任务通过 send_message。先用 group_route(event_id, disposition) 判断消息归属。只有 work 才使用本输入的候选 revision 和 preview_contract；闲聊不更新正在执行的任务。group_publish 必须带被答复的 event_id；无须群回复时静默结束。'},null,2)}];
   for(const a of message.attachments||[])blocks.push({type:'image',mimeType:a.mime,data:(await readFile(a.path)).toString('base64')});
   // Subscribe before prompt; session/wait joins native descendants AND the final Router summary.
   let monitor=this.monitors.get(room.id);
@@ -76,22 +77,7 @@ export class HarnessAdapter{
  }
  async observe(roomId,m){
   let draining=true;
-  const consume=n=>{
-   if(n.method==='subagent.started'){m.workers.set(n.params.childSessionId,{id:n.params.childSessionId,status:'running'});for(const j of m.jobs)j.stage='Worker 正在执行';}
-   if(n.method==='subagent.finished')m.workers.set(n.params.childSessionId,{id:n.params.childSessionId,status:n.params.status,stopReason:n.params.stopReason});
-   if(n.method!=='session.event')return;
-   const {sessionId,event:e}=n.params;const role=sessionId===m.session.id?'router':'worker';
-   if(role==='router'&&e.type==='assistant/message')m.lastText=e.data.message.content.filter(b=>b.type==='text').map(b=>b.text).join('');
-   m.publicCalls??=new Set();
-   if(role==='router'&&e.type==='tool/call'&&e.data.name==='group_publish')m.publicCalls.add(e.data.callId);
-   if(role==='router'&&e.type==='tool/result'&&m.publicCalls.has(e.data.message?.toolCallId)&&!e.data.message.isError){
-    const raw=e.data.message.content.filter(b=>b.type==='text').map(b=>b.text).join('');
-    try{const published=JSON.parse(raw);if(published.published&&typeof published.text==='string'){const j=m.jobs.at(-1);j.replies??=[];j.replies.push({id:`${sessionId}:${e.seq}`,text:published.text,time:e.time});}}catch{/* Invalid publication output is not sent to the group. */}
-   }
-   if(role==='router'&&e.type==='turn/end')m.reason=e.data.reason;
-   if(e.type==='tool/call')for(const j of m.jobs)j.stage=`${role==='worker'?'Worker':'Router'} 正在执行 ${e.data.name||'工具'}`;
-   if(['tool/call','tool/result','turn/start','turn/end'].includes(e.type))for(const j of m.jobs){j.progress.push({role,sessionId,type:e.type,time:e.time,data:e.data});if(j.progress.length>200)j.progress.shift();}
-  };
+  const consume=n=>consumeGroupEvent(m,n,this.state.jobs);
   const drain=(async()=>{try{while(draining)consume(await m.subscription.next());}catch(e){if(draining)throw e;}})();
   try{
    // A newly admitted prompt can race the previous idle receipt; wait for its own activity too.
@@ -99,9 +85,8 @@ export class HarnessAdapter{
    // Already queued wire events are drained before final presentation.
    draining=false;const queued=[];let n;while((n=m.subscription.tryNext()))queued.push(n);m.subscription.close();await drain;for(const event of queued)consume(event);
    if(this.monitors.get(roomId)===m)this.monitors.delete(roomId);
-   const last=m.jobs.at(-1);const reply=m.lastText.trim()==='[[SILENT]]'?null:m.lastText;
-   for(const j of m.jobs){j.status=m.reason?.kind==='error'?'failed':'done';j.stage=j.status==='done'?'本轮已完成':'执行失败';j.workers=[...m.workers.values()];j.outcome={...j.outcome,reply:j===last?(j.replies?.at(-1)?.text||null):null,finishReason:m.reason?.kind};if(j.status==='failed')j.error=m.reason.error?.message||'Harness Router 执行失败';}
-  }catch(e){for(const j of m.jobs){j.status='failed';j.error=e.message;}}
+   for(const j of m.jobs){if(j.status!=='running')continue;j.status=m.reason?.kind==='error'?'failed':'done';j.stage=j.status==='done'?'本轮已完成':'执行失败';j.workers=[...m.workers.values()].filter(w=>m.workerOwners?.get(w.id)===j);j.outcome={...j.outcome,reply:j.replies?.at(-1)?.text||null,finishReason:m.reason?.kind};if(j.status==='failed')j.error=m.reason.error?.message||'Harness Router 执行失败';}
+  }catch(e){for(const j of m.jobs){if(j.status!=='running')continue;j.status='failed';j.error=e.message;}}
   finally{draining=false;m.subscription.close();await drain.catch(e=>{for(const j of m.jobs){j.status='failed';j.error=e.message;}});if(this.monitors.get(roomId)===m)this.monitors.delete(roomId);await this.save();}
  }
  async events(){await this.ensure();let changed=false;

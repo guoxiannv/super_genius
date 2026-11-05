@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {consumeGroupEvent} from '../src/group-events.mjs';
+test('side chatter does not inherit Worker logs or receive the task result',()=>{
+ const job=id=>({event_id:id,thread_id:'room',status:'running',progress:[],replies:[],outcome:{}});
+ const work=job('task'),chat=job('dinner'),ping=job('presence');
+ const m={session:{id:'router'},jobs:[work,chat,ping],workers:new Map()};let seq=0;
+ const event=(sessionId,type,data)=>consumeGroupEvent(m,{method:'session.event',params:{sessionId,event:{type,data,seq:++seq}}});
+ const tool=(name,p)=>{const callId='call'+seq;event('router','tool/call',{name,callId});event('router','tool/result',{message:{toolCallId:callId,content:[{type:'text',text:JSON.stringify(p)}]}});};
+ tool('group_route',{routed:true,event_id:'task',disposition:'work'});
+ consumeGroupEvent(m,{method:'subagent.started',params:{parentSessionId:'router',childSessionId:'worker'}});
+ event('router','turn/start',{turn:2});
+ tool('group_route',{routed:true,event_id:'dinner',disposition:'observe'});
+ event('worker','tool/call',{name:'bash'});
+ assert.equal(chat.status,'done');assert.equal(chat.progress.length,0);assert.equal(chat.stage,'已旁听 · 无需回复');
+ assert.ok(work.progress.some(x=>x.sessionId==='worker'));
+ tool('group_publish',{published:true,event_id:'task',text:'橙色版本完成',reason:'result'});
+ tool('group_publish',{published:true,event_id:'task',text:'橙色版本完成',reason:'result'});
+ tool('group_publish',{published:true,text:'缺失归属不应挂在闲聊下'});
+ assert.equal(work.replies.length,1);assert.equal(chat.replies.length,0);assert.equal(ping.replies.length,0);
+ tool('group_route',{routed:true,event_id:'presence',disposition:'answer'});
+ tool('group_publish',{published:true,event_id:'presence',text:'在，有事直接说。',reason:'answer'});
+ tool('group_publish',{published:true,event_id:'presence',text:'另附旧任务进展',reason:'answer'});
+ event('router','turn/end',{reason:{kind:'completed'}});
+ assert.equal(ping.replies.length,1);assert.equal(ping.status,'done');assert.equal(ping.progress.length,0);
+});
