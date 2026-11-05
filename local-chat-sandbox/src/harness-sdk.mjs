@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
+import {readPreview,productContext} from '../../app-factory-harness/product-state.mjs';
 import {composition} from '../../app-factory-harness/composition.mjs';
 const localRoot=fileURLToPath(new URL('../',import.meta.url));
 export class HarnessAdapter{
@@ -57,8 +58,12 @@ export class HarnessAdapter{
   const roomState=this.state.rooms[room.id];const seen=new Set(roomState.seen||[]);
   const fresh=context.filter(m=>m.type==='human'&&m.id!==message.id&&!seen.has(m.id));
   const artifactDir=resolve(localRoot,'data/artifacts',message.id);await mkdir(artifactDir,{recursive:true});job.artifactDir=artifactDir;
+  const catalog=JSON.parse(await readFile(new URL('../../app-factory-harness/app-goals.json',import.meta.url),'utf8'));
+  const goals=catalog[app.id]||{objective:'按群内确认目标迭代 App',acceptance:[],profiles:['phone'],validationScope:'待核实'};
+  roomState.revision=(roomState.revision||0)+1;job.revision=`r${roomState.revision}`;job.profiles=goals.profiles;
+  const product=productContext(goals,room,this.state.jobs);
   const instructions=resolve(localRoot,'harness/HARMONY.md');
-  const blocks=[{type:'text',text:JSON.stringify({kind:'group_message',room:{id:room.id,name:room.name},app,actor:message.author,addressed:message.addressed,text:message.text,quote:quoted?{text:quoted.text,task:quoted.task_id}:null,unseen_history:fresh.map(m=>({id:m.id,actor:m.author,text:m.text,images:m.attachments?.map(a=>a.path)})),images:message.attachments?.map(a=>a.path),worker_harmony_instructions:instructions,artifact_directory:artifactDir,instructions:'将鸿蒙操作说明路径与参考图路径交给 Worker 自行读取。所有执行任务通过原生 subagent，继续同一任务通过 send_message。普通消息判断是否静默；无须群回复时输出 [[SILENT]]。'},null,2)}];
+  const blocks=[{type:'text',text:JSON.stringify({kind:'group_message',product,revision:job.revision,preview_contract:{path:resolve(artifactDir,'preview.json'),schema:{revision:job.revision,status:'preview | verified | blocked',summary:'一句面向用户的变化说明',images:[{profile:'phone | unfolded | tablet',path:'截图相对路径'}],checks:[{profile:'phone | unfolded | tablet',status:'pending | passed | failed | unavailable',evidence:'实际验证说明'}]},rule:'交给 Worker：第一张可看的真实截图完成后就用原生 write 工具发布 preview.json；后续更新同文件。不要等全部回归完成。passed 需要同版本截图与证据。'},room:{id:room.id,name:room.name},app,actor:message.author,addressed:message.addressed,text:message.text,quote:quoted?{text:quoted.text,task:quoted.task_id,revision:quoted.preview?.revision,images:quoted.preview?.images}:null,unseen_history:fresh.map(m=>({id:m.id,actor:m.author,text:m.text,images:m.attachments?.map(a=>a.path)})),images:message.attachments?.map(a=>a.path),worker_harmony_instructions:instructions,artifact_directory:artifactDir,instructions:'将鸿蒙操作说明路径与参考图路径交给 Worker 自行读取。所有执行任务通过原生 subagent，继续同一任务通过 send_message。普通消息判断是否静默；无须群回复时输出 [[SILENT]]。'},null,2)}];
   for(const a of message.attachments||[])blocks.push({type:'image',mimeType:a.mime,data:(await readFile(a.path)).toString('base64')});
   // Subscribe before prompt; session/wait joins native descendants AND the final Router summary.
   let monitor=this.monitors.get(room.id);
@@ -92,6 +97,12 @@ export class HarnessAdapter{
   }catch(e){for(const j of m.jobs){j.status='failed';j.error=e.message;}}
   finally{draining=false;m.subscription.close();await drain.catch(e=>{for(const j of m.jobs){j.status='failed';j.error=e.message;}});if(this.monitors.get(roomId)===m)this.monitors.delete(roomId);await this.save();}
  }
- async events(){await this.ensure();return structuredClone(this.state.jobs);}
+ async events(){await this.ensure();let changed=false;
+  for(const job of this.state.jobs.filter(j=>j.revision&&j.artifactDir)){
+   try{const preview=await readPreview(job.artifactDir,job.revision,job.profiles);if(preview&&JSON.stringify(preview)!==JSON.stringify(job.preview)){job.preview=preview;delete job.previewError;changed=true;}}
+   catch(e){if(job.previewError!==e.message){job.previewError=e.message;changed=true;}}
+  }
+  if(changed)await this.save();return structuredClone(this.state.jobs);
+ }
  async close(){this.closing=true;await this.harness?.close();await Promise.allSettled(this.operations);await this.tail;}
 }

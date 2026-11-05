@@ -1,0 +1,12 @@
+{
+  "xiaoyi-music": {
+    "objective": "以可视化迭代完成鸿蒙一多适配，保持音乐 App 的核心功能",
+    "acceptance": [
+      "手机、折叠展开、平板窗口分别重排布局；不可只放大手机版",
+      "每次界面交付列明本版本各尺寸的验证状态，未测不能算通过",
+      "保留播放列表、收藏与本地音频导入"
+    ],
+    "profiles": ["phone", "unfolded", "tablet"],
+    "validationScope": "当前案例是 Web App，截图属于鸿蒙浏览器验证"
+  }
+}

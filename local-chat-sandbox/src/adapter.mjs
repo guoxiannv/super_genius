@@ -14,11 +14,13 @@ export class Bridge{
     await this.store.write(data=>{const current=data.messages.find(x=>x.id===m.id);current.delivery='submitted';current.submitted_at=new Date().toISOString();delete current.error;});
    }catch{await this.store.write(data=>{const current=data.messages.find(x=>x.id===m.id);current.attempts++;current.delivery=current.attempts>=3?'failed':'queued';current.error='主服务接收失败，可重试';current.next_attempt_at=Date.now()+3000*current.attempts;});}
   }
-  d=this.store.snapshot();const waiting=d.messages.filter(m=>m.delivery==='submitted');if(!waiting.length)return;
+  d=this.store.snapshot();const waiting=d.messages.filter(m=>m.type==='human'&&['submitted','done','observed'].includes(m.delivery));if(!waiting.length)return;
   let events;try{events=await this.adapter.events();}catch{return;}
   for(const m of waiting){
    const event=events.find(e=>e.event_id===m.event_id&&e.project_id==='local-chat-sandbox'&&e.thread_id===m.room_id);
    if(!event){if(Date.now()-Date.parse(m.submitted_at)>60000)await this.store.write(data=>{const current=data.messages.find(x=>x.id===m.id);current.delivery='missing_result';current.error='Harness 未找到此事件；请核对持久会话，勿直接重复执行';});continue;}
+   if(event.preview&&JSON.stringify(d.messages.find(x=>x.id==='preview-'+m.id)?.preview)!==JSON.stringify(event.preview))await this.store.write(data=>{const id='preview-'+m.id;const previous=data.messages.find(x=>x.id===id);const card={id,room_id:m.room_id,type:'bot',author:{name:'app-factory',role:'版本预览',color:'#267265'},text:event.preview.summary,preview:event.preview,reply_to:m.id,task_id:event.outcome?.task_id,event_id:m.event_id,created_at:previous?.created_at||new Date().toISOString(),delivery:'done'};if(previous)Object.assign(previous,card);else data.messages.push(card);});
+   if(m.delivery!=='submitted')continue;
    await this.store.write(data=>{
     const current=data.messages.find(x=>x.id===m.id);current.stage=event.stage||'Harness 正在处理';current.task_id=event.outcome?.task_id??current.task_id;
     const dirs=events.filter(e=>e.thread_id===m.room_id).map(e=>e.artifactDir).filter(Boolean);
