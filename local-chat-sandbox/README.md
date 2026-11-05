@@ -31,3 +31,7 @@ Router 本身和 Worker 都是 Harness Agent。临时界面没有直接调用 ch
 ## 产品目标和阶段预览
 
 Router 每轮接收独立持久的 App 目标和最近可见版本。Worker 发布 `preview.json` 后，界面即时显示版本卡、各尺寸的验证状态及真实截图；“基于此版本继续改”把版本与图引用一起送回 Router。超过 450 字的机器人说明默认折叠，截图仍展示。卡片中的通过状态来自 Worker 提供的同版本证据，未提供清单不会伪造卡片。
+
+## 团队工作室
+
+打开 `/team.html` 查看幕僚长、专业 Worker、分身设定、分层记忆与 Skill。支持文本 bot 模板预览导入和导出；导入技能为草稿。角色修改、导入与 Skill 启用在下次 Harness 重启生效。当前没有自动重启按钮，以免打断执行。实例页是持久历史记录，不是实时状态面板。App 注册已经迁到 `../app-factory-harness/config/apps.json`，旧 app-factory 已清理。

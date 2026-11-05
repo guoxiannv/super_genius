@@ -4,6 +4,7 @@ import {resolve,dirname} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import {readPreview,productContext} from '../../app-factory-harness/product-state.mjs';
+import {registeredApps} from '../../app-factory-harness/config.mjs';
 import {composition} from '../../app-factory-harness/composition.mjs';
 const localRoot=fileURLToPath(new URL('../',import.meta.url));
 export class HarnessAdapter{
@@ -30,7 +31,7 @@ export class HarnessAdapter{
   try{return await this.ready;}catch(e){await this.harness?.close();this.ready=null;throw e;}
  }
  async health(){await this.ensure();return {ok:true,runtime:'deepseek-harness',router:'Harness Router → Harness Worker',profile:'sdk'};}
- async apps(){const {apps}=JSON.parse(await readFile(resolve(localRoot,'../app-factory/config/apps.local.json'),'utf8'));return apps.map(a=>({...a,root:resolve(localRoot,'../app-factory',a.root)}));}
+ async apps(){return registeredApps();}
  async session(room,app){
   if(this.sessions.has(room.id))return this.sessions.get(room.id);
   const saved=this.state.rooms[room.id];

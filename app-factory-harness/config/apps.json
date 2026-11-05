@@ -1,0 +1,16 @@
+{
+  "apps": [
+    {
+      "id": "xiaoyi-music",
+      "name": "云音乐",
+      "root": "../case-apps/xiaoyi-music",
+      "repo": "local",
+      "defaultProfiles": ["phone"],
+      "allowedActions": ["inspect", "edit", "build", "prepare_review"],
+      "constraints": ["preserve_playlists_and_favorites", "preserve_local_audio_import"]
+    }
+  ],
+  "profiles": {
+    "phone": {"label": "手机", "width": 360, "height": 800}
+  }
+}
