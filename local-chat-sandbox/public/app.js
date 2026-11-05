@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 let attachments=[];
-let state={rooms:[],people:[],messages:[]},roomId=new URLSearchParams(location.search).get('room'),stateRoom=null,lastRevision=-1,quoteId=null,loading=false,posting=false,pendingId=null,personSignature='',lastRoom=null;
+let state={rooms:[],people:[],messages:[],deletedRooms:[]},roomId=new URLSearchParams(location.search).get('room'),stateRoom=null,lastRevision=-1,quoteId=null,loading=false,posting=false,pendingId=null,personSignature='',lastRoom=null;
 const windowId=new URLSearchParams(location.search).get('window')||crypto.randomUUID();
 {const u=new URL(location);u.searchParams.set('window',windowId);history.replaceState({},'',u);}
 const labels={queued:'已存本地 · 等待转发',submitted:'已转发 · 等待主服务',observed:'已作为上下文接收',done:'已处理',failed:'转发或处理失败',missing_result:'结果待核对'};
@@ -14,10 +14,11 @@ function avatar(person,index=0){return node('span','avatar c'+(index%4),person.n
 function openRoomWindow(id){const u=new URL(location.origin);u.searchParams.set('room',id);u.searchParams.set('window',crypto.randomUUID());const w=window.open(u.toString(),'_blank','popup,width=1240,height=850');if(w)w.opener=null;else toast('浏览器阻止了弹窗；请允许本地页面弹窗，或在当前窗口打开群。');}
 function selectRoom(id){if(roomId)sessionStorage.setItem(draftKey(),$('message-text').value);roomId=id;quoteId=null;const u=new URL(location);u.searchParams.set('room',id);history.replaceState({},'',u);lastRevision=-1;render();void refresh();}
 function render(){
+ const active=state.messages.filter(m=>m.room_id===roomId&&['queued','submitted'].includes(m.delivery));$('work-status').hidden=!active.length;$('work-status').textContent=active.length?`Agent 工作中 · ${active.length} 项`:'';
  $('bridge-status').textContent=state.bridge?.connected?`已连接 ${state.bridge.runtime||'服务'} · ${state.bridge.router||'unknown'}`:state.bridge?.note||'主服务未连接';$('status-dot').classList.toggle('online',!!state.bridge?.connected);
  if(lastRevision===state.revision&&lastRoom===roomId)return;lastRevision=state.revision;
  $('room-count').textContent=state.rooms.length;$('room-list').replaceChildren();
- for(const room of state.rooms){const button=node('button','room-button'+(room.id===roomId?' active':''));button.append(node('strong','',room.name),node('small','',`${room.member_ids.length} 人 · ${room.message_count??0} 条消息`));button.onclick=()=>selectRoom(room.id);$('room-list').append(button);}
+ const roomQuery=($('room-search')?.value||'').trim().toLowerCase();for(const room of state.rooms.filter(r=>!roomQuery||r.name.toLowerCase().includes(roomQuery))){const button=node('button','room-button'+(room.id===roomId?' active':''));button.append(node('strong','',room.name),node('small','',`${room.member_ids.length} 人 · ${room.message_count??0} 条消息`));button.onclick=()=>selectRoom(room.id);$('room-list').append(button);}
  $('people-list').replaceChildren();for(const [i,p] of state.people.entries())$('people-list').append(personNode(p,i));
  const room=currentRoom();$('delete-room').disabled=!room;$('message-form').hidden=!room;$('open-window').disabled=!room;$('add-member').disabled=!room;$('export').hidden=!room;
  if(!room){$('room-title').textContent='让团队在这里聊起来。';$('room-meta').textContent='创建一个群，切换身份，@app-factory。';$('messages').textContent=roomId?'这个群不存在或已移入回收站，请从左侧选择。':'选择一个群，或创建新群。';lastRoom=null;return;}
@@ -50,7 +51,7 @@ function renderQuote(){const q=state.messages.find(m=>m.id===quoteId&&m.room_id=
 async function refresh(){if(loading)return;loading=true;const target=roomId;try{const data=await api('/api/state?room='+encodeURIComponent(target||'')+(stateRoom===target?'&since='+encodeURIComponent(state.revision||''):''));if(target!==roomId)return;if(!data.unchanged){state=data;stateRoom=target;}else state.bridge=data.bridge;render();}catch(e){$('bridge-status').textContent='本地聊天服务未连接：'+e.message;$('status-dot').classList.remove('online');}finally{loading=false;if(target!==roomId)void refresh();}}
 function personDialog(){ $('person-form').reset();$('person-dialog').showModal();$('person-name').focus();}
 function roomDialog(){ $('room-form').reset();$('member-choices').replaceChildren();for(const p of state.people){const label=node('label','check');const input=node('input');input.type='checkbox';input.name='members';input.value=p.id;input.checked=true;label.append(input,document.createTextNode(`${p.name} · ${p.role}`));$('member-choices').append(label);} $('room-app').replaceChildren(new Option('未绑定 / 由 Agent 询问',''));api('/api/apps').then(({apps})=>{for(const a of apps)$('room-app').append(new Option(a.name,a.id));}).catch(()=>{});$('room-dialog').showModal();$('room-name').focus();}
-$('new-room').onclick=roomDialog;$('empty-create').onclick=roomDialog;$('new-person').onclick=personDialog;
+$('room-search').oninput=()=>{lastRevision=-1;render();};document.querySelectorAll('[data-quick]').forEach(button=>button.onclick=()=>{const input=$('message-text');input.value=button.dataset.quick;input.dispatchEvent(new Event('input'));input.focus();});$('new-room').onclick=roomDialog;$('empty-create').onclick=roomDialog;$('new-person').onclick=personDialog;
 $('open-window').onclick=()=>openRoomWindow(roomId);$('refresh').onclick=refresh;
 for(const b of document.querySelectorAll('[data-close]'))b.onclick=()=>b.closest('dialog').close();
 $('person-form').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const p=await api('/api/people',{name:$('person-name').value,role:$('person-role').value});if(currentRoom())await api(`/api/rooms/${roomId}/members`,{person_id:p.id});$('person-dialog').close();await refresh();toast(currentRoom()?'人员已创建并加入当前群':'人员已创建');}catch(e){toast(e.message);}finally{button.disabled=false;}};
