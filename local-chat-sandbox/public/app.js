@@ -71,3 +71,6 @@ function renderPending(){$('pending-images').replaceChildren();for(const a of at
 async function uploadImages(files){const targetRoom=roomId;try{for(const file of files){if(attachments.length>=4)throw Error('每条消息最多 4 张图片');if(file.size>6*1024*1024)throw Error('每张图片最多 6MB');const data=await new Promise((yes,no)=>{const reader=new FileReader();reader.onload=()=>yes(reader.result.split(',')[1]);reader.onerror=no;reader.readAsDataURL(file);});const a=await api('/api/uploads',{name:file.name,data});if(targetRoom!==roomId)return;attachments.push(a);renderPending();}}catch(e){toast(e.message);}}
 $('attach').onclick=()=>$('image-input').click();$('image-input').onchange=async()=>{await uploadImages($('image-input').files);$('image-input').value='';};
 $('message-text').addEventListener('paste',e=>{const files=[...e.clipboardData.files].filter(f=>f.type.startsWith('image/'));if(files.length){e.preventDefault();void uploadImages(files);}});
+
+function openTeam(){const url='/team.html?embedded=1&room='+encodeURIComponent(roomId||'');if($('team-frame').getAttribute('src')!==url)$('team-frame').src=url;$('team-drawer').showModal();}
+$('team-open').onclick=openTeam;$('bot-profile').onclick=openTeam;$('team-close').onclick=()=>$('team-drawer').close();

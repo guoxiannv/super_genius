@@ -19,7 +19,7 @@ export async function createChatServer({dataFile=resolve(root,'data/chat.json'),
   if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`)return json(res,403,{error:'origin_rejected'});
   const url=new URL(req.url,'http://127.0.0.1');const path=url.pathname;
   if(req.method==='GET'&&['/','/index.html','/app.js','/style.css','/team.html','/team.js','/team.css'].includes(path)){
-   const name=path==='/'?'/index.html':path;res.writeHead(200,{'Content-Type':name.endsWith('.js')?'text/javascript; charset=utf-8':name.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"});return res.end(assets.get(name));
+   const name=path==='/'?'/index.html':path;res.writeHead(200,{'Content-Type':name.endsWith('.js')?'text/javascript; charset=utf-8':name.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'"});return res.end(assets.get(name));
   }
   if(req.method==='POST'&&path==='/api/uploads')return json(res,201,await saveImage(resolve(root,'data/uploads'),await body(req)));
   if(req.method==='GET'&&path==='/api/media'){const media=await localMedia(resolve(root,'data'),url.searchParams.get('path')||'');res.writeHead(200,{'Content-Type':media.mime,'X-Content-Type-Options':'nosniff','Cache-Control':'no-store'});return res.end(media.bytes);}
@@ -28,6 +28,7 @@ export async function createChatServer({dataFile=resolve(root,'data/chat.json'),
   if(req.method==='POST'&&path==='/api/team/import')return json(res,201,team.importTemplate(await body(req)));
   if(req.method==='POST'&&path==='/api/team/role')return json(res,200,team.saveRole(await body(req)));
   if(req.method==='POST'&&path==='/api/team/memory'){const b=await body(req);return json(res,200,team.reviewMemory(b.id,b.status,b.revision));}
+  if(req.method==='POST'&&path==='/api/team/skill/edit')return json(res,200,team.editSkill(await body(req)));
   if(req.method==='POST'&&path==='/api/team/skill'){const b=await body(req);return json(res,200,team.activateSkill(b.id,b.revision));}
   if(req.method==='GET'&&path==='/api/state')return json(res,200,{...store.snapshot(),bridge:bridge.status});
   if(req.method==='GET'&&path==='/api/apps'){try{return json(res,200,{apps:await adapter.apps()});}catch{return json(res,200,{apps:[],offline:true});}}

@@ -23,7 +23,7 @@ export class Registry{
  get(kind,id){const row=this.db.prepare('SELECT value FROM items WHERE kind=? AND id=?').get(kind,id);return row?JSON.parse(row.value):null;}
  put(kind,item){this.db.prepare('INSERT INTO items VALUES(?,?,?) ON CONFLICT(kind,id) DO UPDATE SET value=excluded.value').run(kind,item.id,JSON.stringify(item));return item;}
  transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const result=fn();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
- saveRole(input){return this.transaction(()=>{const id=slug(input.id);const prev=this.get('role',id);if(!prev)throw Error('请通过模板导入创建新角色');return this.put('role',{...prev,name:text(input.name,'名称',100),persona:text(input.persona,'职责'),revision:(prev.revision||0)+1});});}
+ saveRole(input){return this.transaction(()=>{const id=slug(input.id);const prev=this.get('role',id);if(!prev)throw Error('请通过模板导入创建新角色');if(input.revision!==(prev.revision||0))throw Error('角色已更新，请刷新后再保存');return this.put('role',{...prev,name:text(input.name,'名称',100),persona:text(input.persona,'职责'),revision:(prev.revision||0)+1});});}
  remember(actor,input){return this.transaction(()=>{
   const scope=input.scope;const keys={global:'team',app:actor.app,role:actor.role,session:actor.session};if(!Object.hasOwn(keys,scope)||!keys[scope])throw Error('无效记忆范围');
   const title=text(input.title,'标题',120),body=text(input.body,'记忆',4000),source=text(input.source,'来源',1000);
@@ -44,5 +44,6 @@ export class Registry{
   const skills=input.skills.map(s=>({name:slug(s.name),description:text(s.description,'用途',500),body:text(s.body,'Skill 内容',30000)}));if(new Set(skills.map(s=>s.name)).size!==skills.length)throw Error('模板有重复 Skill');
   return this.transaction(()=>{this.put('role',role);for(const s of skills)this.put('skill',{...s,id:role.id+'--'+s.name,owner:role.id,status:'draft',revision:1,evidence:'由模板导入；未在本机验证',author:'template'});return role;});
  }
+ editSkill(input){const previous=this.get('skill',input.id);if(!previous)throw Error('Skill 不存在');return this.saveSkill({role:previous.owner,session:'local-user'},{...input,name:previous.name});}
  snapshot(){return {roles:this.list('role'),memories:this.list('memory'),skills:this.list('skill'),instances:this.list('instance')};}
 }

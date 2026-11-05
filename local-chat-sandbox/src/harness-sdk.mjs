@@ -81,7 +81,13 @@ export class HarnessAdapter{
    if(n.method==='subagent.finished')m.workers.set(n.params.childSessionId,{id:n.params.childSessionId,status:n.params.status,stopReason:n.params.stopReason});
    if(n.method!=='session.event')return;
    const {sessionId,event:e}=n.params;const role=sessionId===m.session.id?'router':'worker';
-   if(role==='router'&&e.type==='assistant/message'){m.lastText=e.data.message.content.filter(b=>b.type==='text').map(b=>b.text).join('');const text=m.lastText.trim();if(text&&text!=='[[SILENT]]'){const j=m.jobs.at(-1);j.replies??=[];if(!j.replies.some(r=>r.id===`${sessionId}:${e.seq}`))j.replies.push({id:`${sessionId}:${e.seq}`,text,time:e.time});}}
+   if(role==='router'&&e.type==='assistant/message')m.lastText=e.data.message.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+   m.publicCalls??=new Set();
+   if(role==='router'&&e.type==='tool/call'&&e.data.name==='group_publish')m.publicCalls.add(e.data.callId);
+   if(role==='router'&&e.type==='tool/result'&&m.publicCalls.has(e.data.message?.toolCallId)&&!e.data.message.isError){
+    const raw=e.data.message.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    try{const published=JSON.parse(raw);if(published.published&&typeof published.text==='string'){const j=m.jobs.at(-1);j.replies??=[];j.replies.push({id:`${sessionId}:${e.seq}`,text:published.text,time:e.time});}}catch{/* Invalid publication output is not sent to the group. */}
+   }
    if(role==='router'&&e.type==='turn/end')m.reason=e.data.reason;
    if(e.type==='tool/call')for(const j of m.jobs)j.stage=`${role==='worker'?'Worker':'Router'} 正在执行 ${e.data.name||'工具'}`;
    if(['tool/call','tool/result','turn/start','turn/end'].includes(e.type))for(const j of m.jobs){j.progress.push({role,sessionId,type:e.type,time:e.time,data:e.data});if(j.progress.length>200)j.progress.shift();}
@@ -94,7 +100,7 @@ export class HarnessAdapter{
    draining=false;const queued=[];let n;while((n=m.subscription.tryNext()))queued.push(n);m.subscription.close();await drain;for(const event of queued)consume(event);
    if(this.monitors.get(roomId)===m)this.monitors.delete(roomId);
    const last=m.jobs.at(-1);const reply=m.lastText.trim()==='[[SILENT]]'?null:m.lastText;
-   for(const j of m.jobs){j.status=m.reason?.kind==='error'?'failed':'done';j.stage=j.status==='done'?'本轮已完成':'执行失败';j.workers=[...m.workers.values()];j.outcome={...j.outcome,reply:j===last?reply:null,finishReason:m.reason?.kind};if(j.status==='failed')j.error=m.reason.error?.message||'Harness Router 执行失败';}
+   for(const j of m.jobs){j.status=m.reason?.kind==='error'?'failed':'done';j.stage=j.status==='done'?'本轮已完成':'执行失败';j.workers=[...m.workers.values()];j.outcome={...j.outcome,reply:j===last?(j.replies?.at(-1)?.text||null):null,finishReason:m.reason?.kind};if(j.status==='failed')j.error=m.reason.error?.message||'Harness Router 执行失败';}
   }catch(e){for(const j of m.jobs){j.status='failed';j.error=e.message;}}
   finally{draining=false;m.subscription.close();await drain.catch(e=>{for(const j of m.jobs){j.status='failed';j.error=e.message;}});if(this.monitors.get(roomId)===m)this.monitors.delete(roomId);await this.save();}
  }

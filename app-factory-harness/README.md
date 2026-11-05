@@ -30,3 +30,11 @@ Agent 可用 `team_skill_save` 随时沉淀带证据的草稿，用户在管理�
 Share as template 导出角色职责、委派偏好与已启用 Skill，不导出实例、记忆、历史、凭据。导入使用新 id，显示预览，Skills 回到草稿状态。文本可能包含使用者手写的敏感信息，导出前需检查内容；不是自动脱敏系统。
 
 App 注册配置迁至 `config/apps.json`，相对路径以本目录为基准。`reference/feishu-legacy.mjs` 仅保留早期文字长连接的参考实现，不被导入或运行；其旧 store/agent 接口不兼容当前 Harness，后续接飞书应重写传输适配层。
+
+## 群内发言与真实能力观测
+
+主 Agent 仅通过原生 `group_publish` 工具公开发言。SDK 桥接验证相应成功 tool/result，普通 assistant/message 不再直接发送到群。工具进度仍在执行详情、预览在同一卡片更新。
+
+知识插件在实例创建和模型步骤前读取该 scope 的真实 Harness Skill 目录，记录完整性、来源、正文（上限 30KB）和观测时间。管理台区分本项目可编辑 Skill 草稿与实例实际发现的目录；外部目录只读，不能宣称已调用。角色编辑和 Skill 编辑均有版本检查；修改 active Skill 会生成新草稿，下次启用并重启才进入运行目录。
+
+产品缺口清单见 `PRODUCT-GAPS.md`。

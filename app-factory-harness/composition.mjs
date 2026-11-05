@@ -5,7 +5,7 @@ import {registeredApps} from './config.mjs';
 export async function composition(harnessRoot){
  const packageFile=(group,pkg)=>resolve(harnessRoot,'packages',group,pkg,'lib/index.js');
  const db=new Registry();let roles,skills;try{roles=db.list('role');skills=db.list('skill').filter(s=>s.status==='active');}finally{db.close();}
- const knowledge=['team_memory_read','team_memory_write','team_memory_review','team_skill_save','skill'];
+ const knowledge=['team_memory_read','team_memory_write','team_memory_review','team_skill_save','group_publish','skill'];
  const control=['subagent','send_message','interrupt_agent','list_agents','wait_agent','todo_write'];
  const forbidden=['plugin_manager','schedule_create','schedule_edit','schedule_list','schedule_view'];
  const policies=Object.fromEntries(roles.map(r=>[r.id,r.kind==='chief'?{allow:[...control,...knowledge]}:{deny:[...forbidden,...(r.canDelegate?[]:['subagent']),...(r.kind==='clone'?['send_message','interrupt_agent','list_agents','wait_agent']:[])]}]));
@@ -23,7 +23,7 @@ export async function composition(harnessRoot){
   {id:'tool-subagent-fork',disabled:true},{id:'tool-workflow',disabled:true},
   {insert:[{id:'app-preset-registry',name:packageFile('preset','agent-preset-registry'),config:{default:'app-router'}},...declarations,
    {id:'app-role-tools',name:resolve(root,'plugins/role-tools.mjs'),config:{routerPreset:'app-router',policies}},
-   {id:'app-knowledge',name:resolve(root,'plugins/team-knowledge.mjs'),config:{toolsModule:packageFile('core','tools'),database:resolve(root,'data/team.sqlite'),apps:await registeredApps()}},
+   {id:'app-knowledge',name:resolve(root,'plugins/team-knowledge.mjs'),config:{toolsModule:packageFile('core','tools'),scopeModule:packageFile('core','scope'),roleRevisions:Object.fromEntries(roles.map(r=>[r.id,r.revision||0])),database:resolve(root,'data/team.sqlite'),apps:await registeredApps()}},
   ]},
  ];
 }
