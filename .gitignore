@@ -1,0 +1,10 @@
+/*
+!/.gitignore
+!/app-factory-harness/
+!/local-chat-sandbox/
+**/node_modules/
+**/data/
+**/.env
+**/.env.*
+**/.DS_Store
+/local-chat-sandbox/evidence/

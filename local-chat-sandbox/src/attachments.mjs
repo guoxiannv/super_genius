@@ -1,0 +1,6 @@
+import {mkdir,writeFile,readFile,realpath} from 'node:fs/promises';
+import {resolve,sep} from 'node:path';
+import {randomUUID} from 'node:crypto';
+export function imageType(b){if(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return ['image/png','png'];if(b[0]===255&&b[1]===216&&b[2]===255)return ['image/jpeg','jpg'];if(b.subarray(0,4).toString()==='RIFF'&&b.subarray(8,12).toString()==='WEBP')return ['image/webp','webp'];throw Error('仅支持 PNG、JPEG、WebP 图片');}
+export async function saveImage(root,input){if(typeof input.data!=='string'||input.data.length>8*1024*1024||! /^[A-Za-z0-9+/]*={0,2}$/.test(input.data))throw Error('图片过大或编码无效（每张最多 6MB）');const bytes=Buffer.from(input.data,'base64');const [mime,ext]=imageType(bytes);const id=randomUUID();await mkdir(root,{recursive:true});const path=resolve(root,id+'.'+ext);await writeFile(path,bytes,{flag:'wx',mode:0o600});return {id:id+'.'+ext,name:String(input.name||'图片').slice(0,120),mime,path,url:'/api/media?path='+encodeURIComponent(path)};}
+export async function localMedia(root,path){const base=await realpath(root);const file=await realpath(path);if(!file.startsWith(base+sep))throw Error('图片不属于本地聊天附件目录');const bytes=await readFile(file);const [mime]=imageType(bytes);return {bytes,mime};}
