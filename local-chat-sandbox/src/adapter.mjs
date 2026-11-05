@@ -5,7 +5,7 @@ export class Bridge{
   let health;try{health=await this.adapter.health();this.status={connected:true,note:'已连接主服务',url:this.adapter.url,...health};}catch{this.status={connected:false,note:'主服务未启动；聊天已本地保存，消息等待转发',url:this.adapter.url};return;}
   // Serialize within each room: follow-up changes cannot overtake their task creation.
   let d=this.store.snapshot();const selected=new Map();
-  for(const m of d.messages.filter(m=>m.type==='human'&&m.delivery==='queued')){if(!selected.has(m.room_id))selected.set(m.room_id,m);}
+  for(const m of d.messages.filter(m=>m.type==='human'&&m.delivery==='queued'&&!d.rooms.find(r=>r.id===m.room_id)?.deleted_at)){if(!selected.has(m.room_id))selected.set(m.room_id,m);}
   for(const m of selected.values()){
    if(m.delivery!=='queued'||m.next_attempt_at>Date.now())continue;
    try{

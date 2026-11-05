@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 
 // Separate deployment boundary: the temporary chat and Harness stay on loopback.
 export function createGateway({password,origin='https://supergenius.bitfun-platform.com',upstreamPort=8790}) {
- if(!password || password.length<24)throw Error('A password of at least 24 characters is required');
+ if(typeof password!=='string' || !password.trim())throw Error('A non-empty password is required');
  const expected=createHash('sha256').update(`admin:${password}`).digest();
  const publicHost=new URL(origin).host;
  return http.createServer((req,res)=>{
@@ -21,7 +21,7 @@ export function createGateway({password,origin='https://supergenius.bitfun-platf
   for(const key of Object.keys(headers))if(key.startsWith('cf-') || key.startsWith('x-forwarded-') || ['authorization','cookie','connection','proxy-authorization','forwarded'].includes(key))delete headers[key];
   if(headers.origin)headers.origin=`http://127.0.0.1:${upstreamPort}`;
   const upstream=http.request({hostname:'127.0.0.1',port:upstreamPort,path:req.url,method:req.method,headers},response=>{
-   res.writeHead(response.statusCode,{...response.headers,'Cache-Control':'no-store'});response.pipe(res);
+   res.writeHead(response.statusCode,response.headers);response.pipe(res);
   });
   upstream.on('error',()=>{if(!res.headersSent)reply(502,'Local chat service is unavailable');else res.destroy();});
   req.on('aborted',()=>upstream.destroy());

@@ -17,3 +17,19 @@ test('late explicit result stays attached to its original task after a quiet mes
  await bridge.tick();await bridge.tick();taskEvent.replies.push({id:'late-result',text:'已更新橙色预览'});await bridge.tick();await bridge.tick();
  const replies=store.data.messages.filter(x=>x.type==='bot');assert.equal(replies.length,1);assert.equal(replies[0].reply_to,task.id);
 });
+test('room deletion is reversible, rejects active work and disallows new messages',async t=>{
+ const {store,people,room}=await setup(t);const message=await store.post(room.id,input(people[0],'hello'));
+ await assert.rejects(store.setRoomDeleted(room.id,true),/执行中/);
+ await store.write(d=>{d.messages[0].delivery='observed';});await store.setRoomDeleted(room.id,true);
+ await assert.rejects(store.post(room.id,input(people[0],'again')),/群已删除/);
+ await store.setRoomDeleted(room.id,false);assert.equal(store.data.rooms[0].deleted_at,undefined);assert.equal(store.data.messages[0].id,message.id);
+ await store.post(room.id,input(people[0],'restored'));
+});
+test('HTTP room views support compact polling, lazy logs and restore',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'chat-view-http-'));const app=await createChatServer({port:0,dataFile:join(dir,'chat.json'),adapter:{health:async()=>{throw Error('offline');}}});t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
+ const p=app.store.data.people[0];const room=await app.store.createRoom({name:'可恢复群',member_ids:[p.id]});const m=await app.store.post(room.id,input(p,'讨论'));await app.store.write(d=>{d.messages[0].delivery='observed';d.messages[0].progress=[{role:'worker',type:'tool/result',data:{large:'x'.repeat(10000)}}];});
+ const base=`http://127.0.0.1:${app.port}`;const response=await fetch(base+'/api/state?room='+room.id);assert.equal(response.headers.get('content-encoding'),'gzip');const view=await response.json();assert.equal(view.messages[0].progress,undefined);assert.equal(view.messages[0].progress_count,1);
+ assert.equal((await fetch(base+'/api/state?room='+room.id+'&since='+view.revision).then(r=>r.json())).unchanged,true);
+ const logs=await fetch(base+`/api/messages/${m.id}/progress`).then(r=>r.json());assert.ok(logs.progress[0].text.length<=3000);
+ for(const action of ['delete','restore']){assert.equal((await fetch(base+`/api/rooms/${room.id}/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,200);const state=await fetch(base+'/api/state?room='+room.id).then(r=>r.json());assert.equal(state.messages.length,action==='delete'?0:1);}
+});
