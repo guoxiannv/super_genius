@@ -1,6 +1,5 @@
 import http from 'node:http';
 import {createHash} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {gzip} from 'node:zlib';
@@ -10,10 +9,15 @@ import {saveImage,localMedia} from './attachments.mjs';
 import {Registry} from '../../app-factory-harness/registry.mjs';
 import {Store} from './store.mjs';
 import {HarnessAdapter,Bridge} from './adapter.mjs';
+import {serveStatic} from './static-assets.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
-export async function createChatServer({dataFile=resolve(root,'data/chat.json'),adapter=new HarnessAdapter(),port=Number(process.env.CHAT_PORT)||8790}={}){
+export async function createChatServer({
+ dataFile=resolve(root,'data/chat.json'),
+ adapter=new HarnessAdapter(),
+ port=Number(process.env.CHAT_PORT)||8790,
+ staticDir=resolve(root,'..',process.env.CHAT_STATIC_DIR || 'frontend/dist'),
+}={}){
  const store=await new Store(dataFile).load();const team=new Registry();const bridge=new Bridge({store,adapter});
- const assets=new Map(await Promise.all(['index.html','app.js','style.css','team.html','team.js','team.css'].map(async name=>['/'+name,await readFile(resolve(root,'../frontend',name))])));
  const tick=()=>bridge.tick().catch(()=>{bridge.status={connected:false,note:'聊天桥接发生错误；请检查本地服务日志'};console.error('bridge_error');});
  const timer=setInterval(tick,1500);void tick();
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -22,9 +26,7 @@ export async function createChatServer({dataFile=resolve(root,'data/chat.json'),
   if(!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host||''))return json(res,403,{error:'host_rejected'});
   if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`)return json(res,403,{error:'origin_rejected'});
   const url=new URL(req.url,'http://127.0.0.1');const path=url.pathname;
-  if(req.method==='GET'&&['/','/index.html','/app.js','/style.css','/team.html','/team.js','/team.css'].includes(path)){
-   const name=path==='/'?'/index.html':path;res.writeHead(200,{'Content-Type':name.endsWith('.js')?'text/javascript; charset=utf-8':name.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'"});return res.end(assets.get(name));
-  }
+  if(path!=='/api'&&!path.startsWith('/api/'))return await serveStatic(req,res,staticDir);
   if(req.method==='POST'&&path==='/api/uploads')return json(res,201,await saveImage(resolve(root,'data/uploads'),await body(req)));
   if(req.method==='GET'&&path==='/api/media'){const media=await localMedia(resolve(root,'data'),url.searchParams.get('path')||'');const etag='"'+createHash('sha256').update(media.bytes).digest('hex')+'"';const headers={'Content-Type':media.mime,'X-Content-Type-Options':'nosniff','Cache-Control':'private, max-age=60','ETag':etag};if(req.headers['if-none-match']===etag){res.writeHead(304,headers);return res.end();}res.writeHead(200,headers);return res.end(media.bytes);}
   if(req.method==='GET'&&path==='/api/team')return json(res,200,team.snapshot());

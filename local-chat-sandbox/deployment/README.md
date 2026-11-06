@@ -2,7 +2,7 @@
 
 `https://supergenius.bitfun-platform.com` → Cloudflare Tunnel → `http://127.0.0.1:8791`（认证网关）→ `http://127.0.0.1:8790`（原聊天服务）。
 
-网关独立于 Harness，现有 `npm start` 不变。另运行 `node deployment/gateway.mjs`；需要 Node.js 24+。Cloudflare 的 Published application route / Public hostname 应配置该域名，Service 为 `http://127.0.0.1:8791`，保留原始 Host，不设置 HTTP Host Header 覆盖。
+先在仓库根目录按 [本地运行说明](../../README.md#本地运行) 构建前端并启动聊天服务，再在聊天服务目录运行 `node deployment/gateway.mjs`。需要 Node.js 24+。Cloudflare 的 Published application route / Public hostname 应配置该域名，Service 为 `http://127.0.0.1:8791`，保留原始 Host，不设置 HTTP Host Header 覆盖。
 
 网关使用 HTTPS 下的浏览器 Basic 登录，用户名 `admin`。随机密码保存在 `data/tunnel/password`，本机可读的登录说明在 `data/tunnel/login.txt`，文件权限为 0600。它是单个共享访问账户，聊天中的模拟人员不是独立登录账户。以后多人正式使用建议迁移到 Cloudflare Access / 独立用户权限。
 

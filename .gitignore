@@ -1,5 +1,6 @@
 /*
 !/.gitignore
+!/package.json
 !/app-factory-harness/
 !/local-chat-sandbox/
 !/frontend/
@@ -8,4 +9,5 @@
 **/.env
 **/.env.*
 **/.DS_Store
+/frontend/dist/
 /local-chat-sandbox/evidence/

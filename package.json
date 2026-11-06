@@ -1,0 +1,16 @@
+{
+  "name": "super-genius",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "start": "npm --prefix local-chat-sandbox start",
+    "check": "npm --prefix frontend run check",
+    "test": "npm --prefix local-chat-sandbox test",
+    "test:e2e": "npm --prefix frontend run test:e2e"
+  }
+}
