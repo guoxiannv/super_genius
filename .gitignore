@@ -9,4 +9,5 @@
 **/.env
 **/.env.*
 **/.DS_Store
+/frontend/dist/
 /local-chat-sandbox/evidence/

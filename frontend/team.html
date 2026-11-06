@@ -1,1 +1,12 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>团队 · App Factory</title><link rel="stylesheet" href="/team.css"><body><header><a href="/">← 群聊</a><h1>团队工作室</h1><p>幕僚长统筹，专业角色积累经验，分身执行任务。</p><button id="refresh">刷新</button><button id="import">导入 bot 模板</button><input id="file" type="file" accept="application/json" hidden><p id="status" role="status"></p></header><main><section><h2>角色与分身设定</h2><p>角色修改与模板导入保存后，在下次 Harness 重启时加载；不会打断当前任务。</p><div id="roles" class="grid"></div></section><section><h2>实例记录</h2><p>记录已创建的 Harness session，不代表实例此刻正在运行。</p><div id="instances"></div></section><section><h2>分层记忆</h2><p>团队共享 / App / 角色 / 分身。此本机管理页可查看全部；Agent 工具按范围过滤。</p><div id="memories"></div></section><section><h2>Skill 工坊</h2><p>Agent 可自行沉淀草稿；启用后在下次 Harness 重启时进入对应角色的原生 Skill 列表。</p><div id="skills"></div></section></main><dialog id="preview"><h2>导入预览</h2><p>仅导入文本设定和 Skill；不会安装代码、连接外部服务或带入个人记忆。</p><pre id="preview-text"></pre><button id="cancel">取消</button><button id="confirm">创建新角色</button></dialog><script src="/team.js" type="module"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>团队 · App Factory</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/entries/team.tsx"></script>
+  </body>
+</html>

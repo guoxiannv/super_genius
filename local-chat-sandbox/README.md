@@ -1,6 +1,8 @@
 # Local Room · 临时本地聊天群
 
-启动：`npm start`，打开 http://127.0.0.1:8790 。需要 Node.js 24+，已构建的本机 DeepSeek Harness 以及官方 DeepSeek 凭据。
+从仓库根目录安装并构建前端，再运行 `npm start`，打开 [本地群聊](http://127.0.0.1:8790/)。完整命令见 [仓库说明](../README.md#本地运行)。进入本目录后也可以直接运行 `npm start`。需要 Node.js 24+，真实 Agent 执行需要已构建的本机 DeepSeek Harness 和官方 DeepSeek 凭据。
+
+服务默认从前端的 `dist/` 托管构建产物。开发时可单独使用 API，并让 Vite 代理 `/api` 请求。可通过 `CHAT_STATIC_DIR` 指定构建目录。
 
 ## 现在的执行架构
 
@@ -22,7 +24,7 @@ Router 本身和 Worker 都是 Harness Agent。临时界面没有直接调用 ch
 
 `npm test` 覆盖群持久化、角色、幂等、SDK 消息继续接收、恢复映射、Worker 日志不进入模型输入、图片存储与路径限制。真实 Router API smoke 已验证角色和工具白名单。
 
-原生 Worker 完整改代码→构建→模拟器→截图流程尚需单独端到端验收；模拟测试不能替代此项。当前会话限制不允许启动子 Agent，所以这里不把真实 Worker 流程标为通过。
+原生 Worker 的改代码、构建、模拟器和截图流程需要连接真实 Harness 和设备单独验收。浏览器回归使用本地测试适配器验证执行状态和结果展示。
 
 同一 App 和模拟器的串行执行由 Router 角色约束，尚无跨群强制资源锁。模型输出的 Worker JSON 是提示约定，尚无强制 schema。只有原生 group_publish 工具的成功结果进入群聊，普通 assistant/message 不自动公开。Router 用 group_route 判断消息是旁听、简短答复还是工作任务；旁听即时完成，不挂 Worker 执行日志。Worker 日志归属启动它的任务，公开结果必须提供该群有效的 event_id，缺失时不会误挂到最近一句闲聊。简单答复每条输入最多公开一次；完全相同的公开文字按输入去重。
 

@@ -5,6 +5,12 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "CHAT_HOST=0.0.0.0 CHAT_PORT=3000 CHAT_PREVIEW=1 npm --prefix local-chat-sandbox start"
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "start": "npm --prefix local-chat-sandbox start",
+    "check": "npm --prefix frontend run check",
+    "test": "npm --prefix local-chat-sandbox test",
+    "test:e2e": "npm --prefix frontend run test:e2e"
   }
 }
