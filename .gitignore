@@ -2,6 +2,7 @@
 !/.gitignore
 !/app-factory-harness/
 !/local-chat-sandbox/
+!/frontend/
 **/node_modules/
 **/data/
 **/.env

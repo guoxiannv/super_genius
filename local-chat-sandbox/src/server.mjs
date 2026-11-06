@@ -13,7 +13,7 @@ import {HarnessAdapter,Bridge} from './adapter.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 export async function createChatServer({dataFile=resolve(root,'data/chat.json'),adapter=new HarnessAdapter(),port=Number(process.env.CHAT_PORT)||8790}={}){
  const store=await new Store(dataFile).load();const team=new Registry();const bridge=new Bridge({store,adapter});
- const assets=new Map(await Promise.all(['index.html','app.js','style.css','team.html','team.js','team.css'].map(async name=>['/'+name,await readFile(resolve(root,'public',name))])));
+ const assets=new Map(await Promise.all(['index.html','app.js','style.css','team.html','team.js','team.css'].map(async name=>['/'+name,await readFile(resolve(root,'../frontend',name))])));
  const tick=()=>bridge.tick().catch(()=>{bridge.status={connected:false,note:'聊天桥接发生错误；请检查本地服务日志'};console.error('bridge_error');});
  const timer=setInterval(tick,1500);void tick();
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};

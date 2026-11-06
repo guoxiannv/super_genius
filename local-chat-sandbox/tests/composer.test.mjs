@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 test('composer shows local thumbnails before upload and ignores removed pending images',async()=>{
- const source=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
+ const source=await readFile(new URL('../../frontend/app.js',import.meta.url),'utf8');
  const element=()=>({children:[],append(...xs){this.children.push(...xs);},replaceChildren(){this.children=[];},setAttribute(){}});
  const container=element();const uploads=[];let revoked=0;
  const context=vm.createContext({node:()=>element(),$:()=>container,URL:{createObjectURL:()=> 'blob:preview',revokeObjectURL:()=>revoked++},currentRoom:()=>({id:'room'}),toast:()=>{},api:()=>new Promise((resolve,reject)=>uploads.push({resolve,reject})),FileReader:class{readAsDataURL(){this.result='data:image/png;base64,abcd';this.onload();}}});
