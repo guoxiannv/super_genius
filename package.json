@@ -1,0 +1,10 @@
+{
+  "name": "super-genius",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "CHAT_HOST=0.0.0.0 CHAT_PORT=3000 CHAT_PREVIEW=1 npm --prefix local-chat-sandbox start"
+  }
+}

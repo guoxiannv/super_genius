@@ -1,5 +1,6 @@
 /*
 !/.gitignore
+!/package.json
 !/app-factory-harness/
 !/local-chat-sandbox/
 !/frontend/
